@@ -1,7 +1,11 @@
 ﻿using Fullstack.Models;
+using Fullstack.ViewModel;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using System.Data;
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Fullstack.Controllers
 {
@@ -52,7 +56,7 @@ namespace Fullstack.Controllers
 
             string apiUrl2 = "https://fbuweb4rentacar.azurewebsites.net/api/user/getuserscount";
             int recordNumber = 0;
-           
+
             using (HttpClient client2 = new HttpClient())
             {
                 client2.BaseAddress = new Uri(apiUrl);
@@ -63,13 +67,42 @@ namespace Fullstack.Controllers
                 if (response.IsSuccessStatusCode)
                 {
                     var data2 = await response.Content.ReadAsStringAsync();
-                    recordNumber= Newtonsoft.Json.JsonConvert.DeserializeObject<Int32>(data2);
+                    recordNumber = Newtonsoft.Json.JsonConvert.DeserializeObject<Int32>(data2);
                 }
             }
 
 
             ViewBag.recordNumber = recordNumber;
 
+            return View(model);
+        }
+        public async Task<IActionResult> Index2(string qs,int pageNumber = 1)
+        {
+            UserPaginatedViewModel model = new UserPaginatedViewModel();
+
+            HttpClient client = new HttpClient();
+            //active sayfadaki kullanıcıları çeken apicall
+            string apiUrl = "https://fbuweb4rentacar.azurewebsites.net/api/user/getusersbypage/" + pageNumber.ToString();
+            HttpResponseMessage response = await client.GetAsync(apiUrl);
+            string responseBody = await response.Content.ReadAsStringAsync();
+            //toplam  kullanıcı sayısını veren apicall 
+            string apiurl2 = "https://fbuweb4rentacar.azurewebsites.net/api/user/getuserscount";
+            HttpResponseMessage response2 = await client.GetAsync(apiurl2);
+            //model atamaları 
+            model.Users = JsonConvert.DeserializeObject<List<User>>(responseBody).ToList();
+            model.TotalRowsNumber = Convert.ToInt32(await response2.Content.ReadAsStringAsync());
+            model.ActivePageNumber = pageNumber;
+
+
+            model.TotalPageNumber = Convert.ToInt32(Math.Ceiling(Convert.ToDecimal(model.TotalRowsNumber) / 10));
+            model.NextPage = model.ActivePageNumber == model.TotalPageNumber ? false : true;
+            model.LastPage=model.ActivePageNumber == model.TotalPageNumber ? false : true;
+            model.PreviousPage=model.ActivePageNumber == 1 ?  false : true;
+            model.FirstPage=model.ActivePageNumber == 1 ? false : true;
+            model.FirstRowNumber = (model.ActivePageNumber - 1) * 10 + 1;
+            model.LastRowNumber = model.ActivePageNumber * 10;
+
+            model.Users = model.Users.Where(a => a.Email==qs || qs==null).ToList();
             return View(model);
         }
 
